@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Online Chat Uygulaması</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        #login-screen {
+            text-align: center;
+            margin-top: 50px;
+        }
+        #chat-screen {
+            display: none;
+        }
+        #mesajlar {
+            height: 400px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        #mesaj-form {
+            display: flex;
+            gap: 10px;
+        }
+        input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        #mesaj-input {
+            flex-grow: 1;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .mesaj {
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .kullanici-adi {
+            font-weight: bold;
+            color: #2196F3;
+        }
+        #user-count {
+            text-align: right;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .system-message {
+            color: #666;
+            font-style: italic;
+            text-align: center;
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="login-screen">
+        <h1>Online Chat Uygulaması</h1>
+        <form id="login-form">
+            <input type="text" id="username-input" placeholder="Kullanıcı Adınız" required>
+            <button type="submit">Sohbete Katıl</button>
+        </form>
+    </div>
+
+    <div id="chat-screen">
+        <div id="user-count">Çevrimiçi Kullanıcılar: <span id="count">0</span></div>
+        <div id="mesajlar"></div>
+        <form id="mesaj-form">
+            <input type="text" id="mesaj-input" placeholder="Mesajınızı yazın..." required>
+            <button type="submit">Gönder</button>
+        </form>
+    </div>
+
+    <script>
+        const socket = io();
+        const loginScreen = document.getElementById('login-screen');
+        const chatScreen = document.getElementById('chat-screen');
+        const loginForm = document.getElementById('login-form');
+        const mesajlarDiv = document.getElementById('mesajlar');
+        const mesajForm = document.getElementById('mesaj-form');
+        const mesajInput = document.getElementById('mesaj-input');
+        const usernameInput = document.getElementById('username-input');
+        const userCountSpan = document.getElementById('count');
+        
+        let currentUsername = '';
+
+        loginForm.onsubmit = function(e) {
+            e.preventDefault();
+            currentUsername = usernameInput.value.trim();
+            if (currentUsername) {
+                socket.emit('join', { username: currentUsername });
+                loginScreen.style.display = 'none';
+                chatScreen.style.display = 'block';
+                addSystemMessage(`Hoş geldiniz, ${currentUsername}!`);
+            }
+        };
+
+        window.onbeforeunload = function() {
+            if (currentUsername) {
+                socket.emit('leave', { username: currentUsername });
+            }
+        };
+
+        mesajForm.onsubmit = function(e) {
+            e.preventDefault();
+            if (mesajInput.value && currentUsername) {
+                socket.emit('mesaj', {
+                    kullaniciAdi: currentUsername,
+                    mesaj: mesajInput.value
+                });
+                mesajInput.value = '';
+            }
+        };
+
+        function addSystemMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = message;
+            mesajlarDiv.appendChild(messageDiv);
+            mesajlarDiv.scrollTop = mesajlarDiv.scrollHeight;
+        }
+
+        socket.on('mesaj', function(data) {
+            const mesajDiv = document.createElement('div');
+            mesajDiv.className = 'mesaj';
+            mesajDiv.innerHTML = `<span class="kullanici-adi">${data.kullaniciAdi}:</span> ${data.mesaj}`;
+            mesajlarDiv.appendChild(mesajDiv);
+            mesajlarDiv.scrollTop = mesajlarDiv.scrollHeight;
+        });
+
+        socket.on('user_count', function(data) {
+            userCountSpan.textContent = data.count;
+        });
+
+        socket.on('user_joined', function(data) {
+            userCountSpan.textContent = data.count;
+            addSystemMessage(`${data.username} sohbete katıldı`);
+        });
+
+        socket.on('user_left', function(data) {
+            userCountSpan.textContent = data.count;
+            addSystemMessage(`${data.username} sohbetten ayrıldı`);
+        });
+    </script>
+</body>
+</html>
