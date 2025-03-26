@@ -27,13 +27,23 @@ const logoutButton = document.getElementById('logout-button');
 
 let currentUser = null;
 let messagesRef = null;
-let isSubmitting = false; // Çoklu gönderimi engellemek için flag
+let isSubmitting = false;
+let chatRoomId = null;
+
+// Yeni sohbet odası oluştur
+function createNewChatRoom() {
+    chatRoomId = Date.now().toString();
+    return database.ref('chatRooms/' + chatRoomId).set({
+        createdAt: firebase.database.ServerValue.TIMESTAMP,
+        active: true
+    });
+}
 
 // Kullanıcı girişi
 loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (isSubmitting) return; // Eğer form gönderiliyorsa, çık
-    isSubmitting = true; // Form gönderimini başlat
+    if (isSubmitting) return;
+    isSubmitting = true;
 
     const username = usernameInput.value.trim();
     if (username) {
@@ -46,11 +56,16 @@ loginForm.addEventListener('submit', (e) => {
                     name: username
                 };
 
+                // Yeni sohbet odası oluştur
+                return createNewChatRoom();
+            })
+            .then(() => {
                 // Kullanıcıyı veritabanına kaydet
-                return database.ref('users/' + user.uid).set({
+                return database.ref('users/' + currentUser.id).set({
                     username: username,
                     online: true,
-                    lastSeen: firebase.database.ServerValue.TIMESTAMP
+                    lastSeen: firebase.database.ServerValue.TIMESTAMP,
+                    chatRoomId: chatRoomId
                 });
             })
             .then(() => {
@@ -70,7 +85,7 @@ loginForm.addEventListener('submit', (e) => {
                 alert('Giriş yapılamadı. Lütfen tekrar deneyin.');
             })
             .finally(() => {
-                isSubmitting = false; // Form gönderimini bitir
+                isSubmitting = false;
             });
     }
 });
@@ -78,11 +93,11 @@ loginForm.addEventListener('submit', (e) => {
 // Mesaj gönderme
 messageForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (isSubmitting) return; // Eğer mesaj gönderiliyorsa, çık
-    isSubmitting = true; // Mesaj gönderimini başlat
+    if (isSubmitting) return;
+    isSubmitting = true;
 
     const text = messageInput.value.trim();
-    if (text && currentUser) {
+    if (text && currentUser && chatRoomId) {
         const message = {
             uid: currentUser.id,
             username: currentUser.name,
@@ -90,11 +105,10 @@ messageForm.addEventListener('submit', (e) => {
             timestamp: firebase.database.ServerValue.TIMESTAMP
         };
 
-        // Mesaj gönderme işlemi tamamlanana kadar butonu devre dışı bırak
         const submitButton = messageForm.querySelector('button[type="submit"]');
         submitButton.disabled = true;
 
-        database.ref('messages').push(message)
+        database.ref('chatRooms/' + chatRoomId + '/messages').push(message)
             .then(() => {
                 messageInput.value = '';
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -104,8 +118,8 @@ messageForm.addEventListener('submit', (e) => {
                 alert('Mesaj gönderilemedi.');
             })
             .finally(() => {
-                isSubmitting = false; // Mesaj gönderimini bitir
-                submitButton.disabled = false; // Butonu tekrar aktif et
+                isSubmitting = false;
+                submitButton.disabled = false;
             });
     } else {
         isSubmitting = false;
@@ -115,17 +129,16 @@ messageForm.addEventListener('submit', (e) => {
 // Mesajları yükle
 function loadMessages() {
     if (messagesRef) {
-        messagesRef.off(); // Önceki dinleyiciyi temizle
+        messagesRef.off();
     }
 
-    messagesRef = database.ref('messages');
-    const processedMessages = new Set(); // İşlenmiş mesajları takip et
+    messagesRef = database.ref('chatRooms/' + chatRoomId + '/messages');
+    const processedMessages = new Set();
 
     messagesRef.orderByChild('timestamp').limitToLast(50).on('child_added', (snapshot) => {
         const message = snapshot.val();
         const messageId = snapshot.key;
 
-        // Mesaj daha önce işlendiyse, gösterme
         if (!processedMessages.has(messageId)) {
             processedMessages.add(messageId);
             displayMessage(message, messageId);
@@ -135,7 +148,6 @@ function loadMessages() {
 
 // Mesajı görüntüle
 function displayMessage(message, messageId) {
-    // Mesaj zaten görüntülenmişse, tekrar gösterme
     if (document.querySelector(`[data-message-id="${messageId}"]`)) {
         return;
     }
@@ -163,18 +175,24 @@ function displayMessage(message, messageId) {
 function updateOnlineUsers() {
     database.ref('users').on('value', (snapshot) => {
         const users = snapshot.val() || {};
-        const count = Object.keys(users).length;
-        onlineCountElement.textContent = count;
+        const currentRoomUsers = Object.values(users).filter(user => user.chatRoomId === chatRoomId);
+        onlineCountElement.textContent = currentRoomUsers.length;
     });
 }
 
 // Çıkış yap
 logoutButton.addEventListener('click', () => {
-    if (currentUser) {
-        database.ref('users/' + currentUser.id).remove()
+    if (currentUser && chatRoomId) {
+        // Sohbet odasını kapat ve mesajları sil
+        database.ref('chatRooms/' + chatRoomId).remove()
+            .then(() => {
+                return database.ref('users/' + currentUser.id).remove();
+            })
             .then(() => {
                 auth.signOut();
                 currentUser = null;
+                chatRoomId = null;
+                messagesRef = null;
                 chatScreen.classList.remove('active');
                 loginScreen.classList.add('active');
                 messagesContainer.innerHTML = '';
@@ -202,7 +220,8 @@ function formatTime(timestamp) {
 
 // Sayfa yenilendiğinde veya kapatıldığında
 window.addEventListener('beforeunload', () => {
-    if (currentUser) {
+    if (currentUser && chatRoomId) {
+        database.ref('chatRooms/' + chatRoomId).remove();
         database.ref('users/' + currentUser.id).remove();
     }
 });
