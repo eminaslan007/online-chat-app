@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Chat Uygulaması</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Giriş Ekranı -->
+        <div id="login-screen" class="screen active">
+            <div class="login-container">
+                <h1>Chat Uygulaması</h1>
+                <p>Sohbete başlamak için giriş yapın</p>
+                <form id="login-form">
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="username" placeholder="Kullanıcı Adı" required>
+                    </div>
+                    <button type="submit" class="primary-button">
+                        <i class="fas fa-sign-in-alt"></i>
+                        Sohbete Katıl
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Chat Ekranı -->
+        <div id="chat-screen" class="screen">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <div class="user-info">
+                        <i class="fas fa-users"></i>
+                        <span>Çevrimiçi: <span id="online-count">0</span></span>
+                    </div>
+                    <button id="logout-button" class="icon-button">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+
+                <div class="messages-container" id="messages">
+                    <!-- Mesajlar buraya gelecek -->
+                </div>
+
+                <form id="message-form" class="message-input-container">
+                    <div class="input-group">
+                        <input type="text" id="message-input" placeholder="Mesajınızı yazın..." required>
+                        <button type="submit" class="send-button">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-database-compat.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
