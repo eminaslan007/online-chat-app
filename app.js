@@ -10,9 +10,6 @@ const firebaseConfig = {
     databaseURL: "https://online-chat-app-8ea34-default-rtdb.firebaseio.com"
 };
 
-// Authorized domains
-const authorizedDomains = ['aslanchatt.netlify.app', 'localhost'];
-
 // Firebase'i başlat
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
@@ -33,95 +30,114 @@ let messagesRef = null;
 let userRef = null;
 
 // Kullanıcı girişi
-loginForm.addEventListener('submit', (e) => {
+loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = usernameInput.value.trim();
     if (username) {
-        currentUser = {
-            id: Date.now().toString(),
-            name: username,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
-        };
+        try {
+            currentUser = {
+                id: Date.now().toString(),
+                name: username,
+                lastSeen: firebase.database.ServerValue.TIMESTAMP
+            };
 
-        // Kullanıcıyı çevrimiçi kullanıcılara ekle
-        userRef = database.ref('users/' + currentUser.id);
-        userRef.set(currentUser);
+            // Kullanıcıyı çevrimiçi kullanıcılara ekle
+            userRef = database.ref('users/' + currentUser.id);
+            await userRef.set(currentUser);
 
-        // Kullanıcı çıkış yaptığında veya bağlantı koptuğunda
-        userRef.onDisconnect().remove();
+            // Kullanıcı çıkış yaptığında veya bağlantı koptuğunda
+            userRef.onDisconnect().remove();
 
-        // Chat ekranına geç
-        loginScreen.classList.remove('active');
-        chatScreen.classList.add('active');
+            // Her 30 saniyede bir lastSeen'i güncelle
+            setInterval(() => {
+                if (currentUser && userRef) {
+                    userRef.update({
+                        lastSeen: firebase.database.ServerValue.TIMESTAMP
+                    });
+                }
+            }, 30000);
 
-        // Sistem mesajı gönder
-        sendSystemMessage(username + ' sohbete katıldı');
-        
-        // Mesajları dinlemeye başla
-        startMessageListener();
-    }
-});
+            // Chat ekranına geç
+            loginScreen.classList.remove('active');
+            chatScreen.classList.add('active');
 
-// Çıkış yapma
-logoutButton.addEventListener('click', () => {
-    if (currentUser) {
-        if (userRef) {
-            userRef.remove();
+            // Sistem mesajı gönder
+            await sendSystemMessage(username + ' sohbete katıldı');
+            
+            // Mesajları ve kullanıcıları dinlemeye başla
+            startMessageListener();
+            startUserListener();
+        } catch (error) {
+            console.error('Giriş hatası:', error);
+            alert('Giriş yapılamadı. Lütfen tekrar deneyin.');
         }
-        if (messagesRef) {
-            messagesRef.off();
-        }
-        sendSystemMessage(currentUser.name + ' sohbetten ayrıldı');
-        currentUser = null;
-        userRef = null;
-        messagesRef = null;
-        chatScreen.classList.remove('active');
-        loginScreen.classList.add('active');
-        messagesContainer.innerHTML = '';
     }
 });
 
 // Mesaj gönderme
-messageForm.addEventListener('submit', (e) => {
+messageForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (text && currentUser) {
-        const message = {
-            userId: currentUser.id,
-            username: currentUser.name,
-            text: text,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
-        };
+        try {
+            const message = {
+                userId: currentUser.id,
+                username: currentUser.name,
+                text: text,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
 
-        // Mesajı veritabanına ekle
-        database.ref('messages').push(message)
-            .then(() => {
-                messageInput.value = '';
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            })
-            .catch((error) => {
-                console.error('Mesaj gönderme hatası:', error);
-                alert('Mesaj gönderilemedi. Lütfen tekrar deneyin.');
-            });
+            // Mesajı veritabanına ekle
+            await database.ref('messages').push(message);
+            messageInput.value = '';
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        } catch (error) {
+            console.error('Mesaj gönderme hatası:', error);
+            alert('Mesaj gönderilemedi. Lütfen tekrar deneyin.');
+        }
     }
 });
 
 // Mesajları dinlemeye başla
 function startMessageListener() {
     if (messagesRef) {
-        messagesRef.off(); // Eski dinleyiciyi kaldır
+        messagesRef.off();
     }
     
     messagesRef = database.ref('messages');
-    messagesRef.on('child_added', (snapshot) => {
+    messagesRef.orderByChild('timestamp').limitToLast(100).on('child_added', (snapshot) => {
         const message = snapshot.val();
-        displayMessage(message);
+        if (message) {
+            displayMessage(message);
+        }
+    });
+}
+
+// Kullanıcıları dinlemeye başla
+function startUserListener() {
+    const usersRef = database.ref('users');
+    
+    // Aktif kullanıcıları dinle
+    usersRef.on('value', (snapshot) => {
+        const users = snapshot.val() || {};
+        const now = Date.now();
+        const activeUsers = Object.values(users).filter(user => {
+            // Son 1 dakika içinde aktif olan kullanıcıları say
+            return user.lastSeen && (now - user.lastSeen) < 60000;
+        });
+        onlineCountElement.textContent = activeUsers.length;
     });
 }
 
 // Mesajı görüntüleme
 function displayMessage(message) {
+    const existingMessage = document.querySelector(`[data-message-id="${message.timestamp}"]`);
+    if (existingMessage) {
+        return; // Mesaj zaten görüntülenmiş
+    }
+
     const messageElement = document.createElement('div');
+    messageElement.setAttribute('data-message-id', message.timestamp);
     const isSent = message.userId === currentUser?.id;
     
     messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
@@ -140,19 +156,46 @@ function displayMessage(message) {
 }
 
 // Sistem mesajı gönderme
-function sendSystemMessage(text) {
+async function sendSystemMessage(text) {
     const messageElement = document.createElement('div');
     messageElement.className = 'system-message';
     messageElement.textContent = text;
     messagesContainer.appendChild(messageElement);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Sistem mesajını veritabanına da kaydet
+    try {
+        await database.ref('messages').push({
+            type: 'system',
+            text: text,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+    } catch (error) {
+        console.error('Sistem mesajı gönderme hatası:', error);
+    }
 }
 
-// Çevrimiçi kullanıcıları takip etme
-database.ref('users').on('value', (snapshot) => {
-    const users = snapshot.val() || {};
-    const count = Object.keys(users).length;
-    onlineCountElement.textContent = count;
+// Çıkış yapma
+logoutButton.addEventListener('click', async () => {
+    if (currentUser) {
+        try {
+            if (userRef) {
+                await userRef.remove();
+            }
+            if (messagesRef) {
+                messagesRef.off();
+            }
+            await sendSystemMessage(currentUser.name + ' sohbetten ayrıldı');
+            currentUser = null;
+            userRef = null;
+            messagesRef = null;
+            chatScreen.classList.remove('active');
+            loginScreen.classList.add('active');
+            messagesContainer.innerHTML = '';
+        } catch (error) {
+            console.error('Çıkış hatası:', error);
+        }
+    }
 });
 
 // Yardımcı fonksiyonlar
