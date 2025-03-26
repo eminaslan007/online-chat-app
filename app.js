@@ -29,7 +29,8 @@ const onlineCountElement = document.getElementById('online-count');
 const logoutButton = document.getElementById('logout-button');
 
 let currentUser = null;
-let onlineUsers = {};
+let messagesRef = null;
+let userRef = null;
 
 // Kullanıcı girişi
 loginForm.addEventListener('submit', (e) => {
@@ -43,7 +44,7 @@ loginForm.addEventListener('submit', (e) => {
         };
 
         // Kullanıcıyı çevrimiçi kullanıcılara ekle
-        const userRef = database.ref('users/' + currentUser.id);
+        userRef = database.ref('users/' + currentUser.id);
         userRef.set(currentUser);
 
         // Kullanıcı çıkış yaptığında veya bağlantı koptuğunda
@@ -57,16 +58,23 @@ loginForm.addEventListener('submit', (e) => {
         sendSystemMessage(username + ' sohbete katıldı');
         
         // Mesajları dinlemeye başla
-        loadMessages();
+        startMessageListener();
     }
 });
 
 // Çıkış yapma
 logoutButton.addEventListener('click', () => {
     if (currentUser) {
-        database.ref('users/' + currentUser.id).remove();
+        if (userRef) {
+            userRef.remove();
+        }
+        if (messagesRef) {
+            messagesRef.off();
+        }
         sendSystemMessage(currentUser.name + ' sohbetten ayrıldı');
         currentUser = null;
+        userRef = null;
+        messagesRef = null;
         chatScreen.classList.remove('active');
         loginScreen.classList.add('active');
         messagesContainer.innerHTML = '';
@@ -98,12 +106,14 @@ messageForm.addEventListener('submit', (e) => {
     }
 });
 
-// Mesajları yükleme ve dinleme
-function loadMessages() {
-    const messagesRef = database.ref('messages');
+// Mesajları dinlemeye başla
+function startMessageListener() {
+    if (messagesRef) {
+        messagesRef.off(); // Eski dinleyiciyi kaldır
+    }
     
-    // Son 100 mesajı al
-    messagesRef.limitToLast(100).on('child_added', (snapshot) => {
+    messagesRef = database.ref('messages');
+    messagesRef.on('child_added', (snapshot) => {
         const message = snapshot.val();
         displayMessage(message);
     });
@@ -162,7 +172,7 @@ function formatTime(timestamp) {
 
 // Sayfa yenilendiğinde veya kapatıldığında çıkış yapma
 window.addEventListener('beforeunload', () => {
-    if (currentUser) {
-        database.ref('users/' + currentUser.id).remove();
+    if (currentUser && userRef) {
+        userRef.remove();
     }
 });
