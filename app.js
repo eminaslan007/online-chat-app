@@ -7,7 +7,7 @@ const firebaseConfig = {
     messagingSenderId: "31701961349",
     appId: "1:31701961349:web:76aac5bcd1732e7111b7ec",
     measurementId: "G-RPNJJL0S7P",
-    databaseURL: "https://online-chat-app-8ea34-default-rtdb.firebaseio.com" // Realtime Database URL'ini ekleyin
+    databaseURL: "https://online-chat-app-8ea34-default-rtdb.firebaseio.com"
 };
 
 // Authorized domains
@@ -43,7 +43,7 @@ loginForm.addEventListener('submit', (e) => {
         };
 
         // Kullanıcıyı çevrimiçi kullanıcılara ekle
-        const userRef = database.ref(`users/${currentUser.id}`);
+        const userRef = database.ref('users/' + currentUser.id);
         userRef.set(currentUser);
 
         // Kullanıcı çıkış yaptığında veya bağlantı koptuğunda
@@ -54,7 +54,7 @@ loginForm.addEventListener('submit', (e) => {
         chatScreen.classList.add('active');
 
         // Sistem mesajı gönder
-        sendSystemMessage(`${username} sohbete katıldı`);
+        sendSystemMessage(username + ' sohbete katıldı');
         
         // Mesajları dinlemeye başla
         loadMessages();
@@ -64,8 +64,8 @@ loginForm.addEventListener('submit', (e) => {
 // Çıkış yapma
 logoutButton.addEventListener('click', () => {
     if (currentUser) {
-        database.ref(`users/${currentUser.id}`).remove();
-        sendSystemMessage(`${currentUser.name} sohbetten ayrıldı`);
+        database.ref('users/' + currentUser.id).remove();
+        sendSystemMessage(currentUser.name + ' sohbetten ayrıldı');
         currentUser = null;
         chatScreen.classList.remove('active');
         loginScreen.classList.add('active');
@@ -85,15 +85,25 @@ messageForm.addEventListener('submit', (e) => {
             timestamp: firebase.database.ServerValue.TIMESTAMP
         };
 
-        database.ref('messages').push(message);
-        messageInput.value = '';
+        // Mesajı veritabanına ekle
+        database.ref('messages').push(message)
+            .then(() => {
+                messageInput.value = '';
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            })
+            .catch((error) => {
+                console.error('Mesaj gönderme hatası:', error);
+                alert('Mesaj gönderilemedi. Lütfen tekrar deneyin.');
+            });
     }
 });
 
 // Mesajları yükleme ve dinleme
 function loadMessages() {
     const messagesRef = database.ref('messages');
-    messagesRef.on('child_added', (snapshot) => {
+    
+    // Son 100 mesajı al
+    messagesRef.limitToLast(100).on('child_added', (snapshot) => {
         const message = snapshot.val();
         displayMessage(message);
     });
@@ -107,7 +117,7 @@ function displayMessage(message) {
     messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
     
     if (!isSent) {
-        messageElement.innerHTML += `<div class="username">${message.username}</div>`;
+        messageElement.innerHTML += `<div class="username">${escapeHtml(message.username)}</div>`;
     }
     
     messageElement.innerHTML += `
@@ -130,8 +140,9 @@ function sendSystemMessage(text) {
 
 // Çevrimiçi kullanıcıları takip etme
 database.ref('users').on('value', (snapshot) => {
-    onlineUsers = snapshot.val() || {};
-    onlineCountElement.textContent = Object.keys(onlineUsers).length;
+    const users = snapshot.val() || {};
+    const count = Object.keys(users).length;
+    onlineCountElement.textContent = count;
 });
 
 // Yardımcı fonksiyonlar
@@ -152,6 +163,6 @@ function formatTime(timestamp) {
 // Sayfa yenilendiğinde veya kapatıldığında çıkış yapma
 window.addEventListener('beforeunload', () => {
     if (currentUser) {
-        database.ref(`users/${currentUser.id}`).remove();
+        database.ref('users/' + currentUser.id).remove();
     }
 });
