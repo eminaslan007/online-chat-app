@@ -1,13 +1,13 @@
 // Firebase yapılandırması
 const firebaseConfig = {
-    // Firebase Console'dan alacağınız yapılandırma bilgileri
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    databaseURL: "YOUR_DATABASE_URL",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    // Buraya Firebase Console'dan aldığınız bilgileri yapıştıracaksınız
+    apiKey: "AIzaSyA1234567890-abcdefghijklmnop", // Sizin API anahtarınız
+    authDomain: "online-chat-app-xxxxx.firebaseapp.com", // Sizin auth domain'iniz
+    databaseURL: "https://online-chat-app-xxxxx-default-rtdb.firebaseio.com", // Sizin database URL'niz
+    projectId: "online-chat-app-xxxxx", // Sizin proje ID'niz
+    storageBucket: "online-chat-app-xxxxx.appspot.com", // Sizin storage bucket'ınız
+    messagingSenderId: "123456789012", // Sizin messaging sender ID'niz
+    appId: "1:123456789012:web:abcdef1234567890" // Sizin app ID'niz
 };
 
 // Firebase'i başlat
