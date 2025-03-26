@@ -64,120 +64,11 @@ loginForm.addEventListener('submit', (e) => {
             });
         })
         .then(() => {
-            // Diğer kullanıcıyı kontrol et
-            return database.ref('users').once('value');
-        })
-        .then((snapshot) => {
-            const users = snapshot.val() || {};
-            const onlineUsers = Object.values(users).filter(user => 
-                ALLOWED_USERS.includes(user.username.toUpperCase())
-            );
-
-            if (onlineUsers.length === 2) {
-                // Her iki kullanıcı da çevrimiçi, sohbeti başlat
-                loginScreen.classList.remove('active');
-                chatScreen.classList.add('active');
-                loadMessages();
-                updateOnlineUsers();
-            } else {
-                // Diğer kullanıcı henüz giriş yapmamışsa, beklemede kal
-                const waitingScreen = document.createElement('div');
-                waitingScreen.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0, 0, 0, 0.8);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    flex-direction: column;
-                    color: white;
-                    z-index: 9999;
-                    font-family: 'Poppins', sans-serif;
-                `;
-                
-                const spinner = document.createElement('div');
-                spinner.style.cssText = `
-                    width: 50px;
-                    height: 50px;
-                    border: 5px solid #f3f3f3;
-                    border-top: 5px solid #667eea;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                    margin-bottom: 20px;
-                `;
-                
-                const style = document.createElement('style');
-                style.textContent = `
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                `;
-                document.head.appendChild(style);
-                
-                const message = document.createElement('div');
-                message.textContent = `Diğer kullanıcının giriş yapması bekleniyor...`;
-                message.style.fontSize = '18px';
-                
-                const cancelButton = document.createElement('button');
-                cancelButton.textContent = 'İptal Et';
-                cancelButton.style.cssText = `
-                    margin-top: 20px;
-                    padding: 10px 20px;
-                    border: none;
-                    border-radius: 20px;
-                    background: #667eea;
-                    color: white;
-                    cursor: pointer;
-                    font-family: 'Poppins', sans-serif;
-                    transition: all 0.3s ease;
-                `;
-                
-                cancelButton.addEventListener('mouseover', () => {
-                    cancelButton.style.transform = 'translateY(-2px)';
-                    cancelButton.style.boxShadow = '0 5px 15px rgba(0,0,0,0.2)';
-                });
-                
-                cancelButton.addEventListener('mouseout', () => {
-                    cancelButton.style.transform = 'translateY(0)';
-                    cancelButton.style.boxShadow = 'none';
-                });
-                
-                cancelButton.onclick = () => {
-                    document.body.removeChild(waitingScreen);
-                    database.ref('users/' + currentUser.id).remove()
-                        .then(() => {
-                            auth.signOut();
-                            currentUser = null;
-                        });
-                };
-                
-                waitingScreen.appendChild(spinner);
-                waitingScreen.appendChild(message);
-                waitingScreen.appendChild(cancelButton);
-                document.body.appendChild(waitingScreen);
-                
-                // Diğer kullanıcıyı dinle
-                const userRef = database.ref('users');
-                const userListener = userRef.on('value', (snapshot) => {
-                    const users = snapshot.val() || {};
-                    const onlineUsers = Object.values(users).filter(user => 
-                        ALLOWED_USERS.includes(user.username.toUpperCase())
-                    );
-                    
-                    if (onlineUsers.length === 2) {
-                        userRef.off('value', userListener);
-                        document.body.removeChild(waitingScreen);
-                        loginScreen.classList.remove('active');
-                        chatScreen.classList.add('active');
-                        loadMessages();
-                        updateOnlineUsers();
-                    }
-                });
-            }
+            // Doğrudan sohbete geç
+            loginScreen.classList.remove('active');
+            chatScreen.classList.add('active');
+            loadMessages();
+            updateOnlineUsers();
         })
         .catch((error) => {
             console.error('Giriş hatası:', error);
@@ -277,12 +168,6 @@ function updateOnlineUsers() {
             ALLOWED_USERS.includes(user.username.toUpperCase())
         );
         onlineCountElement.textContent = onlineUsers.length;
-
-        // Eğer diğer kullanıcı çıkış yaptıysa, bizi de çıkış yaptır
-        if (onlineUsers.length < 2 && currentUser) {
-            alert('Diğer kullanıcı çıkış yaptı. Sohbet sonlandırılıyor.');
-            logoutButton.click();
-        }
     });
 }
 
