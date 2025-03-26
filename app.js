@@ -2,12 +2,11 @@
 const firebaseConfig = {
     apiKey: "AIzaSyBxDWDzkG24fwxaCOdBB8x0HPIehC6C02c",
     authDomain: "online-chat-app-8ea34.firebaseapp.com",
+    databaseURL: "https://online-chat-app-8ea34-default-rtdb.europe-west1.firebasedatabase.app",
     projectId: "online-chat-app-8ea34",
     storageBucket: "online-chat-app-8ea34.firebasestorage.app",
     messagingSenderId: "31701961349",
-    appId: "1:31701961349:web:76aac5bcd1732e7111b7ec",
-    measurementId: "G-RPNJJL0S7P",
-    databaseURL: "https://online-chat-app-8ea34-default-rtdb.europe-west1.firebasedatabase.app"
+    appId: "1:31701961349:web:76aac5bcd1732e7111b7ec"
 };
 
 // Firebase'i başlat
