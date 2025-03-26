@@ -2,65 +2,297 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Modern Chat Uygulaması</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aslan Chat</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            touch-action: manipulation;
+        }
+
+        .screen {
+            display: none;
+            height: 100vh;
+            width: 100%;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Login Screen */
+        #login-screen {
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        }
+
+        .login-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .login-container h1 {
+            color: #1e3c72;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        #login-form input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #login-form input:focus {
+            border-color: #1e3c72;
+        }
+
+        #login-form button {
+            width: 100%;
+            padding: 12px;
+            background: #1e3c72;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #login-form button:hover {
+            background: #2a5298;
+        }
+
+        /* Chat Screen */
+        #chat-screen {
+            background: #f0f2f5;
+        }
+
+        .chat-header {
+            background: #1e3c72;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+
+        .chat-header h2 {
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #logout-button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 8px;
+            font-size: 16px;
+        }
+
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 80px 15px 80px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .message {
+            max-width: 80%;
+            margin: 8px 0;
+            padding: 10px;
+            border-radius: 10px;
+            position: relative;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.received {
+            background: white;
+            margin-right: auto;
+            border-bottom-left-radius: 2px;
+        }
+
+        .message.sent {
+            background: #0084ff;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 2px;
+        }
+
+        .username {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .sent .username {
+            color: #fff;
+        }
+
+        .time {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .chat-footer {
+            background: white;
+            padding: 15px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+        }
+
+        #message-form {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        #message-input:focus {
+            border-color: #1e3c72;
+        }
+
+        #message-form button {
+            background: #1e3c72;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        #message-form button:hover {
+            background: #2a5298;
+        }
+
+        #message-form button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 768px) {
+            .message {
+                max-width: 90%;
+            }
+
+            .chat-header h2 {
+                font-size: 16px;
+            }
+
+            #message-input {
+                font-size: 14px;
+            }
+        }
+
+        /* Dokunmatik cihazlar için iyileştirmeler */
+        @media (hover: none) {
+            #message-form button:hover {
+                background: #1e3c72;
+            }
+
+            #login-form button:hover {
+                background: #1e3c72;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="app-container">
-        <!-- Giriş Ekranı -->
-        <div id="login-screen" class="screen active">
-            <div class="login-container">
-                <h1>Chat Uygulaması</h1>
-                <p>Sohbete başlamak için giriş yapın</p>
-                <form id="login-form">
-                    <div class="input-group">
-                        <i class="fas fa-user"></i>
-                        <input type="text" id="username" placeholder="Kullanıcı Adı" required>
-                    </div>
-                    <button type="submit" class="primary-button">
-                        <i class="fas fa-sign-in-alt"></i>
-                        Sohbete Katıl
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Chat Ekranı -->
-        <div id="chat-screen" class="screen">
-            <div class="chat-container">
-                <div class="chat-header">
-                    <div class="user-info">
-                        <i class="fas fa-users"></i>
-                        <span>Çevrimiçi: <span id="online-count">0</span></span>
-                    </div>
-                    <button id="logout-button" class="icon-button">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                </div>
-
-                <div class="messages-container" id="messages">
-                    <!-- Mesajlar buraya gelecek -->
-                </div>
-
-                <form id="message-form" class="message-input-container">
-                    <div class="input-group">
-                        <input type="text" id="message-input" placeholder="Mesajınızı yazın..." required>
-                        <button type="submit" class="send-button">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </form>
-            </div>
+    <div id="login-screen" class="screen active">
+        <div class="login-container">
+            <h1>Aslan Chat</h1>
+            <form id="login-form">
+                <input type="text" id="username" placeholder="Kullanıcı adınız" autocomplete="off" required>
+                <button type="submit">Sohbete Katıl</button>
+            </form>
         </div>
     </div>
 
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <div id="chat-screen" class="screen">
+        <div class="chat-header">
+            <h2>
+                <i class="fas fa-users"></i>
+                Çevrimiçi: <span id="online-count">0</span>
+            </h2>
+            <button id="logout-button">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </div>
+        <div id="messages"></div>
+        <div class="chat-footer">
+            <form id="message-form">
+                <input type="text" id="message-input" placeholder="Mesajınız..." autocomplete="off">
+                <button type="submit">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
