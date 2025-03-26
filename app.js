@@ -28,16 +28,10 @@ const logoutButton = document.getElementById('logout-button');
 let currentUser = null;
 let messagesRef = null;
 let isSubmitting = false;
-let chatRoomId = null;
+let chatRoomId = 'private-chat-room'; // Sabit sohbet odası
 
-// Yeni sohbet odası oluştur
-function createNewChatRoom() {
-    chatRoomId = Date.now().toString();
-    return database.ref('chatRooms/' + chatRoomId).set({
-        createdAt: firebase.database.ServerValue.TIMESTAMP,
-        active: true
-    });
-}
+// İzin verilen kullanıcılar
+const ALLOWED_USERS = ['EMİN', 'KÜBRA'];
 
 // Kullanıcı girişi
 loginForm.addEventListener('submit', (e) => {
@@ -45,49 +39,63 @@ loginForm.addEventListener('submit', (e) => {
     if (isSubmitting) return;
     isSubmitting = true;
 
-    const username = usernameInput.value.trim();
-    if (username) {
-        // Anonim giriş yap
-        auth.signInAnonymously()
-            .then((userCredential) => {
-                const user = userCredential.user;
-                currentUser = {
-                    id: user.uid,
-                    name: username
-                };
+    const username = usernameInput.value.trim().toUpperCase();
 
-                // Yeni sohbet odası oluştur
-                return createNewChatRoom();
-            })
-            .then(() => {
-                // Kullanıcıyı veritabanına kaydet
-                return database.ref('users/' + currentUser.id).set({
-                    username: username,
-                    online: true,
-                    lastSeen: firebase.database.ServerValue.TIMESTAMP,
-                    chatRoomId: chatRoomId
-                });
-            })
-            .then(() => {
-                // Kullanıcı çıkış yaptığında veritabanından sil
-                database.ref('users/' + currentUser.id).onDisconnect().remove();
+    // Sadece EMİN ve KÜBRA kullanıcı adlarına izin ver
+    if (!ALLOWED_USERS.includes(username)) {
+        alert('Sadece EMİN ve KÜBRA kullanıcı adlarıyla giriş yapabilirsiniz.');
+        isSubmitting = false;
+        return;
+    }
 
-                // Chat ekranına geç
+    auth.signInAnonymously()
+        .then((userCredential) => {
+            const user = userCredential.user;
+            currentUser = {
+                id: user.uid,
+                name: username
+            };
+
+            // Kullanıcıyı veritabanına kaydet
+            return database.ref('users/' + user.uid).set({
+                username: username,
+                online: true,
+                lastSeen: firebase.database.ServerValue.TIMESTAMP
+            });
+        })
+        .then(() => {
+            // Diğer kullanıcıyı kontrol et
+            return database.ref('users').once('value');
+        })
+        .then((snapshot) => {
+            const users = snapshot.val() || {};
+            const onlineUsers = Object.values(users).filter(user => 
+                ALLOWED_USERS.includes(user.username.toUpperCase())
+            );
+
+            if (onlineUsers.length === 2) {
+                // Her iki kullanıcı da çevrimiçi, sohbeti başlat
                 loginScreen.classList.remove('active');
                 chatScreen.classList.add('active');
-
-                // Mesajları yükle
                 loadMessages();
                 updateOnlineUsers();
-            })
-            .catch((error) => {
-                console.error('Giriş hatası:', error);
+            } else {
+                throw new Error('Diğer kullanıcı henüz giriş yapmamış');
+            }
+        })
+        .catch((error) => {
+            console.error('Giriş hatası:', error);
+            if (error.message === 'Diğer kullanıcı henüz giriş yapmamış') {
+                alert('Diğer kullanıcı henüz giriş yapmamış. Lütfen bekleyin.');
+                auth.signOut();
+                currentUser = null;
+            } else {
                 alert('Giriş yapılamadı. Lütfen tekrar deneyin.');
-            })
-            .finally(() => {
-                isSubmitting = false;
-            });
-    }
+            }
+        })
+        .finally(() => {
+            isSubmitting = false;
+        });
 });
 
 // Mesaj gönderme
@@ -97,7 +105,7 @@ messageForm.addEventListener('submit', (e) => {
     isSubmitting = true;
 
     const text = messageInput.value.trim();
-    if (text && currentUser && chatRoomId) {
+    if (text && currentUser) {
         const message = {
             uid: currentUser.id,
             username: currentUser.name,
@@ -135,7 +143,7 @@ function loadMessages() {
     messagesRef = database.ref('chatRooms/' + chatRoomId + '/messages');
     const processedMessages = new Set();
 
-    messagesRef.orderByChild('timestamp').limitToLast(50).on('child_added', (snapshot) => {
+    messagesRef.orderByChild('timestamp').on('child_added', (snapshot) => {
         const message = snapshot.val();
         const messageId = snapshot.key;
 
@@ -175,23 +183,26 @@ function displayMessage(message, messageId) {
 function updateOnlineUsers() {
     database.ref('users').on('value', (snapshot) => {
         const users = snapshot.val() || {};
-        const currentRoomUsers = Object.values(users).filter(user => user.chatRoomId === chatRoomId);
-        onlineCountElement.textContent = currentRoomUsers.length;
+        const onlineUsers = Object.values(users).filter(user => 
+            ALLOWED_USERS.includes(user.username.toUpperCase())
+        );
+        onlineCountElement.textContent = onlineUsers.length;
+
+        // Eğer diğer kullanıcı çıkış yaptıysa, bizi de çıkış yaptır
+        if (onlineUsers.length < 2 && currentUser) {
+            alert('Diğer kullanıcı çıkış yaptı. Sohbet sonlandırılıyor.');
+            logoutButton.click();
+        }
     });
 }
 
 // Çıkış yap
 logoutButton.addEventListener('click', () => {
-    if (currentUser && chatRoomId) {
-        // Sohbet odasını kapat ve mesajları sil
-        database.ref('chatRooms/' + chatRoomId).remove()
-            .then(() => {
-                return database.ref('users/' + currentUser.id).remove();
-            })
+    if (currentUser) {
+        database.ref('users/' + currentUser.id).remove()
             .then(() => {
                 auth.signOut();
                 currentUser = null;
-                chatRoomId = null;
                 messagesRef = null;
                 chatScreen.classList.remove('active');
                 loginScreen.classList.add('active');
@@ -220,8 +231,7 @@ function formatTime(timestamp) {
 
 // Sayfa yenilendiğinde veya kapatıldığında
 window.addEventListener('beforeunload', () => {
-    if (currentUser && chatRoomId) {
-        database.ref('chatRooms/' + chatRoomId).remove();
+    if (currentUser) {
         database.ref('users/' + currentUser.id).remove();
     }
 });
