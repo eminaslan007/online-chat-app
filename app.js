@@ -26,10 +26,15 @@ const onlineCountElement = document.getElementById('online-count');
 const logoutButton = document.getElementById('logout-button');
 
 let currentUser = null;
+let messagesRef = null;
+let isSubmitting = false; // Çoklu gönderimi engellemek için flag
 
 // Kullanıcı girişi
 loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (isSubmitting) return; // Eğer form gönderiliyorsa, çık
+    isSubmitting = true; // Form gönderimini başlat
+
     const username = usernameInput.value.trim();
     if (username) {
         // Anonim giriş yap
@@ -63,6 +68,9 @@ loginForm.addEventListener('submit', (e) => {
             .catch((error) => {
                 console.error('Giriş hatası:', error);
                 alert('Giriş yapılamadı. Lütfen tekrar deneyin.');
+            })
+            .finally(() => {
+                isSubmitting = false; // Form gönderimini bitir
             });
     }
 });
@@ -70,6 +78,9 @@ loginForm.addEventListener('submit', (e) => {
 // Mesaj gönderme
 messageForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    if (isSubmitting) return; // Eğer mesaj gönderiliyorsa, çık
+    isSubmitting = true; // Mesaj gönderimini başlat
+
     const text = messageInput.value.trim();
     if (text && currentUser) {
         const message = {
@@ -79,6 +90,10 @@ messageForm.addEventListener('submit', (e) => {
             timestamp: firebase.database.ServerValue.TIMESTAMP
         };
 
+        // Mesaj gönderme işlemi tamamlanana kadar butonu devre dışı bırak
+        const submitButton = messageForm.querySelector('button[type="submit"]');
+        submitButton.disabled = true;
+
         database.ref('messages').push(message)
             .then(() => {
                 messageInput.value = '';
@@ -87,22 +102,46 @@ messageForm.addEventListener('submit', (e) => {
             .catch((error) => {
                 console.error('Mesaj gönderme hatası:', error);
                 alert('Mesaj gönderilemedi.');
+            })
+            .finally(() => {
+                isSubmitting = false; // Mesaj gönderimini bitir
+                submitButton.disabled = false; // Butonu tekrar aktif et
             });
+    } else {
+        isSubmitting = false;
     }
 });
 
 // Mesajları yükle
 function loadMessages() {
-    const messagesRef = database.ref('messages');
+    if (messagesRef) {
+        messagesRef.off(); // Önceki dinleyiciyi temizle
+    }
+
+    messagesRef = database.ref('messages');
+    const processedMessages = new Set(); // İşlenmiş mesajları takip et
+
     messagesRef.orderByChild('timestamp').limitToLast(50).on('child_added', (snapshot) => {
         const message = snapshot.val();
-        displayMessage(message);
+        const messageId = snapshot.key;
+
+        // Mesaj daha önce işlendiyse, gösterme
+        if (!processedMessages.has(messageId)) {
+            processedMessages.add(messageId);
+            displayMessage(message, messageId);
+        }
     });
 }
 
 // Mesajı görüntüle
-function displayMessage(message) {
+function displayMessage(message, messageId) {
+    // Mesaj zaten görüntülenmişse, tekrar gösterme
+    if (document.querySelector(`[data-message-id="${messageId}"]`)) {
+        return;
+    }
+
     const messageElement = document.createElement('div');
+    messageElement.setAttribute('data-message-id', messageId);
     const isSent = message.uid === currentUser?.id;
     
     messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
