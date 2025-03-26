@@ -7,7 +7,7 @@ const firebaseConfig = {
     messagingSenderId: "31701961349",
     appId: "1:31701961349:web:76aac5bcd1732e7111b7ec",
     measurementId: "G-RPNJJL0S7P",
-    databaseURL: "https://online-chat-app-8ea34-default-rtdb.firebaseio.com"
+    databaseURL: "https://online-chat-app-8ea34-default-rtdb.europe-west1.firebasedatabase.app"
 };
 
 // Firebase'i başlat
