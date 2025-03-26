@@ -12,6 +12,7 @@ const firebaseConfig = {
 
 // Firebase'i başlat
 firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
 const database = firebase.database();
 
 // DOM elementleri
@@ -26,119 +27,84 @@ const onlineCountElement = document.getElementById('online-count');
 const logoutButton = document.getElementById('logout-button');
 
 let currentUser = null;
-let messagesRef = null;
-let userRef = null;
 
 // Kullanıcı girişi
-loginForm.addEventListener('submit', async (e) => {
+loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const username = usernameInput.value.trim();
     if (username) {
-        try {
-            currentUser = {
-                id: Date.now().toString(),
-                name: username,
-                lastSeen: firebase.database.ServerValue.TIMESTAMP
-            };
+        // Anonim giriş yap
+        auth.signInAnonymously()
+            .then((userCredential) => {
+                const user = userCredential.user;
+                currentUser = {
+                    id: user.uid,
+                    name: username
+                };
 
-            // Kullanıcıyı çevrimiçi kullanıcılara ekle
-            userRef = database.ref('users/' + currentUser.id);
-            await userRef.set(currentUser);
+                // Kullanıcıyı veritabanına kaydet
+                return database.ref('users/' + user.uid).set({
+                    username: username,
+                    online: true,
+                    lastSeen: firebase.database.ServerValue.TIMESTAMP
+                });
+            })
+            .then(() => {
+                // Kullanıcı çıkış yaptığında veritabanından sil
+                database.ref('users/' + currentUser.id).onDisconnect().remove();
 
-            // Kullanıcı çıkış yaptığında veya bağlantı koptuğunda
-            userRef.onDisconnect().remove();
+                // Chat ekranına geç
+                loginScreen.classList.remove('active');
+                chatScreen.classList.add('active');
 
-            // Her 30 saniyede bir lastSeen'i güncelle
-            setInterval(() => {
-                if (currentUser && userRef) {
-                    userRef.update({
-                        lastSeen: firebase.database.ServerValue.TIMESTAMP
-                    });
-                }
-            }, 30000);
-
-            // Chat ekranına geç
-            loginScreen.classList.remove('active');
-            chatScreen.classList.add('active');
-
-            // Sistem mesajı gönder
-            await sendSystemMessage(username + ' sohbete katıldı');
-            
-            // Mesajları ve kullanıcıları dinlemeye başla
-            startMessageListener();
-            startUserListener();
-        } catch (error) {
-            console.error('Giriş hatası:', error);
-            alert('Giriş yapılamadı. Lütfen tekrar deneyin.');
-        }
+                // Mesajları yükle
+                loadMessages();
+                updateOnlineUsers();
+            })
+            .catch((error) => {
+                console.error('Giriş hatası:', error);
+                alert('Giriş yapılamadı. Lütfen tekrar deneyin.');
+            });
     }
 });
 
 // Mesaj gönderme
-messageForm.addEventListener('submit', async (e) => {
+messageForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (text && currentUser) {
-        try {
-            const message = {
-                userId: currentUser.id,
-                username: currentUser.name,
-                text: text,
-                timestamp: firebase.database.ServerValue.TIMESTAMP
-            };
+        const message = {
+            uid: currentUser.id,
+            username: currentUser.name,
+            text: text,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        };
 
-            // Mesajı veritabanına ekle
-            await database.ref('messages').push(message);
-            messageInput.value = '';
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        } catch (error) {
-            console.error('Mesaj gönderme hatası:', error);
-            alert('Mesaj gönderilemedi. Lütfen tekrar deneyin.');
-        }
+        database.ref('messages').push(message)
+            .then(() => {
+                messageInput.value = '';
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            })
+            .catch((error) => {
+                console.error('Mesaj gönderme hatası:', error);
+                alert('Mesaj gönderilemedi.');
+            });
     }
 });
 
-// Mesajları dinlemeye başla
-function startMessageListener() {
-    if (messagesRef) {
-        messagesRef.off();
-    }
-    
-    messagesRef = database.ref('messages');
-    messagesRef.orderByChild('timestamp').limitToLast(100).on('child_added', (snapshot) => {
+// Mesajları yükle
+function loadMessages() {
+    const messagesRef = database.ref('messages');
+    messagesRef.orderByChild('timestamp').limitToLast(50).on('child_added', (snapshot) => {
         const message = snapshot.val();
-        if (message) {
-            displayMessage(message);
-        }
+        displayMessage(message);
     });
 }
 
-// Kullanıcıları dinlemeye başla
-function startUserListener() {
-    const usersRef = database.ref('users');
-    
-    // Aktif kullanıcıları dinle
-    usersRef.on('value', (snapshot) => {
-        const users = snapshot.val() || {};
-        const now = Date.now();
-        const activeUsers = Object.values(users).filter(user => {
-            // Son 1 dakika içinde aktif olan kullanıcıları say
-            return user.lastSeen && (now - user.lastSeen) < 60000;
-        });
-        onlineCountElement.textContent = activeUsers.length;
-    });
-}
-
-// Mesajı görüntüleme
+// Mesajı görüntüle
 function displayMessage(message) {
-    const existingMessage = document.querySelector(`[data-message-id="${message.timestamp}"]`);
-    if (existingMessage) {
-        return; // Mesaj zaten görüntülenmiş
-    }
-
     const messageElement = document.createElement('div');
-    messageElement.setAttribute('data-message-id', message.timestamp);
-    const isSent = message.userId === currentUser?.id;
+    const isSent = message.uid === currentUser?.id;
     
     messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
     
@@ -155,46 +121,29 @@ function displayMessage(message) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-// Sistem mesajı gönderme
-async function sendSystemMessage(text) {
-    const messageElement = document.createElement('div');
-    messageElement.className = 'system-message';
-    messageElement.textContent = text;
-    messagesContainer.appendChild(messageElement);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-    // Sistem mesajını veritabanına da kaydet
-    try {
-        await database.ref('messages').push({
-            type: 'system',
-            text: text,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
-        });
-    } catch (error) {
-        console.error('Sistem mesajı gönderme hatası:', error);
-    }
+// Çevrimiçi kullanıcıları güncelle
+function updateOnlineUsers() {
+    database.ref('users').on('value', (snapshot) => {
+        const users = snapshot.val() || {};
+        const count = Object.keys(users).length;
+        onlineCountElement.textContent = count;
+    });
 }
 
-// Çıkış yapma
-logoutButton.addEventListener('click', async () => {
+// Çıkış yap
+logoutButton.addEventListener('click', () => {
     if (currentUser) {
-        try {
-            if (userRef) {
-                await userRef.remove();
-            }
-            if (messagesRef) {
-                messagesRef.off();
-            }
-            await sendSystemMessage(currentUser.name + ' sohbetten ayrıldı');
-            currentUser = null;
-            userRef = null;
-            messagesRef = null;
-            chatScreen.classList.remove('active');
-            loginScreen.classList.add('active');
-            messagesContainer.innerHTML = '';
-        } catch (error) {
-            console.error('Çıkış hatası:', error);
-        }
+        database.ref('users/' + currentUser.id).remove()
+            .then(() => {
+                auth.signOut();
+                currentUser = null;
+                chatScreen.classList.remove('active');
+                loginScreen.classList.add('active');
+                messagesContainer.innerHTML = '';
+            })
+            .catch((error) => {
+                console.error('Çıkış hatası:', error);
+            });
     }
 });
 
@@ -213,9 +162,9 @@ function formatTime(timestamp) {
     });
 }
 
-// Sayfa yenilendiğinde veya kapatıldığında çıkış yapma
+// Sayfa yenilendiğinde veya kapatıldığında
 window.addEventListener('beforeunload', () => {
-    if (currentUser && userRef) {
-        userRef.remove();
+    if (currentUser) {
+        database.ref('users/' + currentUser.id).remove();
     }
 });
