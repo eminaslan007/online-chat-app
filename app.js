@@ -1,14 +1,17 @@
 // Firebase yapılandırması
 const firebaseConfig = {
-    // Buraya Firebase Console'dan aldığınız bilgileri yapıştıracaksınız
-    apiKey: "AIzaSyA1234567890-abcdefghijklmnop", // Sizin API anahtarınız
-    authDomain: "online-chat-app-xxxxx.firebaseapp.com", // Sizin auth domain'iniz
-    databaseURL: "https://online-chat-app-xxxxx-default-rtdb.firebaseio.com", // Sizin database URL'niz
-    projectId: "online-chat-app-xxxxx", // Sizin proje ID'niz
-    storageBucket: "online-chat-app-xxxxx.appspot.com", // Sizin storage bucket'ınız
-    messagingSenderId: "123456789012", // Sizin messaging sender ID'niz
-    appId: "1:123456789012:web:abcdef1234567890" // Sizin app ID'niz
+    apiKey: "AIzaSyBxDWDzkG24fwxaCOdBB8x0HPIehC6C02c",
+    authDomain: "online-chat-app-8ea34.firebaseapp.com",
+    projectId: "online-chat-app-8ea34",
+    storageBucket: "online-chat-app-8ea34.firebasestorage.app",
+    messagingSenderId: "31701961349",
+    appId: "1:31701961349:web:76aac5bcd1732e7111b7ec",
+    measurementId: "G-RPNJJL0S7P",
+    databaseURL: "https://online-chat-app-8ea34-default-rtdb.firebaseio.com" // Realtime Database URL'ini ekleyin
 };
+
+// Authorized domains
+const authorizedDomains = ['aslanchatt.netlify.app', 'localhost'];
 
 // Firebase'i başlat
 firebase.initializeApp(firebaseConfig);
